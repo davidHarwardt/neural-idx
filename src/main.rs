@@ -230,25 +230,35 @@ enum Dimension {
 
 
 fn main() {
-    use std::io::Read;
-    let label_file = std::fs::File::open("./train-data/train-labels.idx1-ubyte").expect("could not open file");
-    let mut reader = std::io::BufReader::new(label_file);
-
-    let magic: u16 = reader.read_be();
-    let ty: u8 = reader.read_be();
-    let dim: u8 = reader.read_be();
-
-    let size_x: u32 = reader.read_be();
-    dbg!((magic, ty, dim, size_x));
-
     let labels: Vec<u8> = read_idx_path("./train-data/train-labels.idx1-ubyte");
     let images: Vec<Vec<u8>> = read_idx_path("./train-data/train-images.idx3-ubyte");
     dbg!(labels.len(), images[0].len());
+
+    let mut net: Network<f32, Sigmoid, SquaredError> = Network::new_random(&[images[0].len(), 10, 10, 10]);
+    let learn_rate = 0.1;
+
+    for (img, label) in images.iter().zip(labels.iter()) {
+        let mut expected = vec![0.01; 10];
+        expected[*label as usize] = 0.99;
+
+        let p = DataPoint::new(img.iter().map(|v| (*v as f32) / 255.0 * 0.98 + 0.01).collect(), expected);
+        net.train_data_point(learn_rate, p);
+    }
+
+    println!("finished training");
+
+    let test_labels: Vec<u8> = read_idx_path("./train-data/t10k-labels.idx1-ubyte");
+    let test_images: Vec<Vec<u8>> = read_idx_path("./train-data/t10k-images.idx3-ubyte");
+
+    let acc = (test_images.iter().zip(test_labels.iter()).filter(|(img, label)| {
+        let res = net.classify(img.iter().map(|v| (*v as f32) / 255.0 * 0.98 + 0.01).collect());
+        (res == **label as _)
+    }).count() as f32) / (test_images.len() as f32);
+    println!("acc: {acc}");
 }
 
 fn net_main() {
     let mut net: Network<f32, Sigmoid, SquaredError> = Network::new_random(&[5, 10, 10, 5]);
-
 
     // let res = net.classify(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
     // println!("res: {res}");
